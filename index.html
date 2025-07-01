@@ -1,7 +1,533 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Vector Interactive Interface</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .plot-container {
+            position: relative;
+            margin: 30px auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: visible;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        #emotionPlot {
+            display: block;
+            cursor: crosshair;
+            border-radius: 15px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .user-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .user-input label {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .user-input input {
+            padding: 8px 12px;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        .user-input input:focus {
+            border-color: #764ba2;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .user-input input:invalid {
+            border-color: #ff6b6b;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .clear-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+        }
+
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .export-btn {
+            background: linear-gradient(45deg, #51cf66, #40c057);
+            color: white;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(81, 207, 102, 0.3);
+        }
+
+        .undo-btn {
+            background: linear-gradient(45deg, #ffa500, #ff8c00);
+            color: white;
+        }
+
+        .undo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 165, 0, 0.3);
+        }
+
+        .undo-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .info {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .data-count {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 16px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .axis-label {
+            position: absolute;
+            font-weight: bold;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .arousal-label {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .valence-label {
+            right: 65px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+    </style>
+</head>
 <body>
-<h1>Hello World</h1>
-<p>check for update!</p>
+    <div class="container">
+        <h1 class="title">Emotion Vector Interactive Interface</h1>
+
+        <div class="plot-container">
+            <canvas id="emotionPlot" width="500" height="500"></canvas>
+            <div class="axis-label arousal-label">Arousal</div>
+            <div class="axis-label valence-label">Valence</div>
+        </div>
+
+        <div class="data-count" id="dataCount">Recorded Points: 0</div>
+
+        <div class="user-input">
+            <label for="userIdInput">User ID:</label>
+            <input type="text" id="userIdInput" placeholder="Enter user ID (letters and numbers only)"
+                   pattern="[A-Za-z0-9]+" title="Only letters and numbers are allowed">
+        </div>
+
+        <div class="controls">
+            <button class="clear-btn" onclick="clearData()">Clear All Points</button>
+            <button class="undo-btn" id="undoBtn" onclick="undoLastPoint()" disabled>Undo Last Point</button>
+            <button class="export-btn" onclick="exportData()">Export JSON Data</button>
+        </div>
+
+        <div class="info">
+            <strong>Instructions:</strong><br>
+            • Click anywhere on the plot to add emotion points<br>
+            • X-axis: Valence (1-9), Y-axis: Arousal (1-9)<br>
+            • Center point (5,5) represents neutral emotional state<br>
+            • Each point automatically records timestamp and connects to previous point<br>
+            • Use "Undo Last Point" to remove the most recently added point<br>
+            • 🟢 Green: Start point | 🔵 Blue: Middle points | 🔴 Red: Latest point
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('emotionPlot');
+        const ctx = canvas.getContext('2d');
+        let emotionData = [];
+
+        // 初始化繪圖
+        function initPlot() {
+            // 清除畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 設置背景漸層
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#f8f9ff');
+            gradient.addColorStop(1, '#e3f2fd');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 計算plot區域 (留出邊距給標籤)
+            const plotMargin = 50;
+            const plotWidth = canvas.width - 2 * plotMargin;
+            const plotHeight = canvas.height - 2 * plotMargin;
+            const plotLeft = plotMargin;
+            const plotTop = plotMargin;
+
+            // 繪製網格
+            drawGrid(plotLeft, plotTop, plotWidth, plotHeight);
+
+            // 繪製坐標軸
+            drawAxes(plotLeft, plotTop, plotWidth, plotHeight);
+
+            // 繪製標籤
+            drawLabels(plotLeft, plotTop, plotWidth, plotHeight);
+
+            // 繪製數據點
+            drawDataPoints(plotLeft, plotTop, plotWidth, plotHeight);
+        }
+
+        function drawGrid(left, top, width, height) {
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+
+            // 垂直線
+            for (let i = 1; i <= 9; i++) {
+                const x = left + (i - 0.5) * (width / 9);
+                ctx.beginPath();
+                ctx.moveTo(x, top);
+                ctx.lineTo(x, top + height);
+                ctx.stroke();
+            }
+
+            // 水平線
+            for (let i = 1; i <= 9; i++) {
+                const y = top + height - (i - 0.5) * (height / 9);
+                ctx.beginPath();
+                ctx.moveTo(left, y);
+                ctx.lineTo(left + width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes(left, top, width, height) {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+
+            // X軸 (中央)
+            const centerY = top + height / 2;
+            ctx.beginPath();
+            ctx.moveTo(left, centerY);
+            ctx.lineTo(left + width, centerY);
+            ctx.stroke();
+
+            // Y軸 (中央)
+            const centerX = left + width / 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, top);
+            ctx.lineTo(centerX, top + height);
+            ctx.stroke();
+        }
+
+        function drawLabels(left, top, width, height) {
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+
+            // X軸標籤
+            for (let i = 1; i <= 9; i++) {
+                const x = left + (i - 0.5) * (width / 9);
+                ctx.fillText(i.toString(), x, top + height + 20);
+            }
+
+            // Y軸標籤
+            ctx.textAlign = 'right';
+            for (let i = 1; i <= 9; i++) {
+                const y = top + height - (i - 0.5) * (height / 9) + 5;
+                ctx.fillText(i.toString(), left - 10, y);
+            }
+        }
+
+        function drawDataPoints(left, top, width, height) {
+            // 先繪製連接線
+            if (emotionData.length > 1) {
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]); // 虛線效果
+
+                ctx.beginPath();
+                for (let i = 0; i < emotionData.length; i++) {
+                    const point = emotionData[i];
+                    const x = left + (point.valence - 0.5) * (width / 9);
+                    const y = top + height - (point.arousal - 0.5) * (height / 9);
+
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+                ctx.setLineDash([]); // 重置虛線
+            }
+
+            // 再繪製數據點
+            emotionData.forEach((point, index) => {
+                const x = left + (point.valence - 0.5) * (width / 9);
+                const y = top + height - (point.arousal - 0.5) * (height / 9);
+
+                // 繪製點
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, 2 * Math.PI);
+
+                // 第一個點使用綠色，最後一個點使用紅色，其他使用藍色
+                if (index === 0) {
+                    ctx.fillStyle = '#51cf66'; // 綠色 - 起始點
+                } else if (index === emotionData.length - 1) {
+                    ctx.fillStyle = '#ff6b6b'; // 紅色 - 最新點
+                } else {
+                    ctx.fillStyle = '#667eea'; // 藍色 - 中間點
+                }
+
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 繪製序號
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText((index + 1).toString(), x, y + 3);
+            });
+        }
+
+        // 滑鼠點擊事件
+        canvas.addEventListener('click', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            // 計算plot區域
+            const plotMargin = 50;
+            const plotWidth = canvas.width - 2 * plotMargin;
+            const plotHeight = canvas.height - 2 * plotMargin;
+            const plotLeft = plotMargin;
+            const plotTop = plotMargin;
+
+            // 檢查點擊是否在plot區域內
+            if (x >= plotLeft && x <= plotLeft + plotWidth &&
+                y >= plotTop && y <= plotTop + plotHeight) {
+
+                // 轉換為情緒座標 (1-9)
+                const relativeX = x - plotLeft;
+                const relativeY = y - plotTop;
+                const valence = Math.round((relativeX / plotWidth) * 9 + 0.5);
+                const arousal = Math.round((1 - relativeY / plotHeight) * 9 + 0.5);
+
+                // 確保座標在範圍內
+                if (valence >= 1 && valence <= 9 && arousal >= 1 && arousal <= 9) {
+                    // 添加數據點
+                    const timestamp = new Date().toISOString();
+                    emotionData.push({
+                        valence: valence,
+                        arousal: arousal,
+                        timestamp: timestamp
+                    });
+
+                    // 重新繪製
+                    initPlot();
+
+                    // 更新計數
+                    updateDataCount();
+
+                    // 添加動畫效果
+                    animateNewPoint(x, y);
+                }
+            }
+        });
+
+        function animateNewPoint(x, y) {
+            let scale = 0;
+            const animate = () => {
+                if (scale < 1.5) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 15 * scale, 0, 2 * Math.PI);
+                    ctx.strokeStyle = `rgba(102, 126, 234, ${1 - scale/1.5})`;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    scale += 0.1;
+                    requestAnimationFrame(animate);
+                } else {
+                    initPlot(); // 重新繪製清除動畫
+                }
+            };
+            animate();
+        }
+
+        function updateDataCount() {
+            document.getElementById('dataCount').textContent = `Recorded Points: ${emotionData.length}`;
+
+            // Update undo button state
+            const undoBtn = document.getElementById('undoBtn');
+            undoBtn.disabled = emotionData.length === 0;
+        }
+
+        function undoLastPoint() {
+            if (emotionData.length === 0) {
+                alert('No points to undo');
+                return;
+            }
+
+            // Remove the last point
+            emotionData.pop();
+
+            // Redraw the plot
+            initPlot();
+
+            // Update counter and button state
+            updateDataCount();
+        }
+
+        function clearData() {
+            if (emotionData.length === 0) {
+                alert('No data to clear');
+                return;
+            }
+
+            if (confirm('Are you sure you want to clear all data?')) {
+                emotionData = [];
+                initPlot();
+                updateDataCount();
+            }
+        }
+
+        function exportData() {
+            if (emotionData.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            // Get user ID from input
+            const userIdInput = document.getElementById('userIdInput');
+            let userId = userIdInput.value.trim();
+
+            // Validate user ID (only letters and numbers)
+            const validPattern = /^[A-Za-z0-9]+$/;
+            if (!userId) {
+                alert('Please enter a User ID before exporting');
+                userIdInput.focus();
+                return;
+            }
+
+            if (!validPattern.test(userId)) {
+                alert('User ID can only contain letters and numbers');
+                userIdInput.focus();
+                return;
+            }
+
+            const jsonData = JSON.stringify(emotionData, null, 2);
+
+            // Create download link with user ID as filename
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${userId}_emotion_data.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // Also display in console
+            console.log('Exported emotion data:', jsonData);
+            alert(`Successfully exported ${emotionData.length} data points for user: ${userId}!`);
+        }
+
+        // Real-time input validation for user ID
+        document.getElementById('userIdInput').addEventListener('input', function(event) {
+            const input = event.target;
+            const value = input.value;
+
+            // Remove any characters that are not letters or numbers
+            const sanitizedValue = value.replace(/[^A-Za-z0-9]/g, '');
+
+            if (value !== sanitizedValue) {
+                input.value = sanitizedValue;
+            }
+        });
+
+        // Initialize
+        initPlot();
+        updateDataCount();
+    </script>
 </body>
 </html>
